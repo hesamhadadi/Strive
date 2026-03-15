@@ -13,59 +13,82 @@ interface Props {
   habit: Habit
   today: string
   onToggle: () => void
+  highlight?: boolean
 }
 
-export default function HabitCard({ habit, today, onToggle }: Props) {
+export default function HabitCard({ habit, today, onToggle, highlight }: Props) {
   const done = habit.completions.includes(today)
   const streak = calculateStreak(habit.completions, today)
 
   return (
     <button
       onClick={onToggle}
-      className="w-full flex items-center gap-4 p-4 rounded-2xl transition-all duration-300 text-left group active:scale-[0.98]"
+      className="w-full flex items-center gap-3.5 p-4 rounded-2xl text-left group active:scale-[0.97] transition-all duration-200"
       style={{
         background: done
-          ? `linear-gradient(135deg, ${habit.color}18, ${habit.color}08)`
-          : 'rgba(26,26,36,0.8)',
-        border: `1px solid ${done ? habit.color + '40' : 'rgba(255,255,255,0.06)'}`,
-        boxShadow: done ? `0 0 20px ${habit.color}15` : 'none',
+          ? `linear-gradient(135deg, ${habit.color}14, ${habit.color}06)`
+          : 'rgba(22,22,32,0.9)',
+        border: `1px solid ${done ? habit.color + '35' : 'rgba(255,255,255,0.06)'}`,
+        boxShadow: highlight
+          ? `0 0 0 2px ${habit.color}60, 0 0 30px ${habit.color}20`
+          : done
+          ? `0 0 20px ${habit.color}10`
+          : 'none',
+        transition: 'all 0.25s ease',
       }}
     >
-      {/* Icon */}
-      <div className="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center text-2xl transition-transform group-active:scale-95"
+      {/* Icon bubble */}
+      <div
+        className="flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center text-xl"
         style={{
-          background: done ? `${habit.color}20` : 'rgba(255,255,255,0.04)',
-          border: `1px solid ${done ? habit.color + '30' : 'rgba(255,255,255,0.06)'}`,
-        }}>
+          background: done ? `${habit.color}18` : 'rgba(255,255,255,0.05)',
+          border: `1px solid ${done ? habit.color + '25' : 'rgba(255,255,255,0.07)'}`,
+          transition: 'all 0.2s',
+        }}
+      >
         {habit.icon}
       </div>
 
-      {/* Content */}
-      <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm text-white font-body truncate"
-          style={{ textDecoration: done ? 'line-through' : 'none', opacity: done ? 0.7 : 1 }}>
+      {/* Text */}
+      <div className="flex-1 min-w-0 text-left">
+        <p
+          className="font-medium text-sm font-body truncate"
+          style={{
+            color: done ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.9)',
+            textDecoration: done ? 'line-through' : 'none',
+          }}
+        >
           {habit.name}
         </p>
-        <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>
-          {habit.category}
+        <div className="flex items-center gap-2 mt-0.5">
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)' }}>{habit.category}</span>
           {streak > 1 && (
-            <span className="ml-2" style={{ color: '#FF6B35' }}>
-              🔥 {streak} day streak
+            <span
+              className="flex items-center gap-0.5 font-semibold"
+              style={{ fontSize: 11, color: '#FF6B35' }}
+            >
+              🔥 {streak}d
             </span>
           )}
-        </p>
+        </div>
       </div>
 
       {/* Checkbox */}
-      <div className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-all duration-300"
+      <div
+        className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-all duration-300"
         style={{
           background: done ? habit.color : 'transparent',
-          border: `2px solid ${done ? habit.color : 'rgba(255,255,255,0.2)'}`,
-          boxShadow: done ? `0 0 12px ${habit.color}60` : 'none',
-        }}>
+          border: `2px solid ${done ? habit.color : 'rgba(255,255,255,0.18)'}`,
+          boxShadow: done ? `0 0 14px ${habit.color}55` : 'none',
+          transform: highlight && done ? 'scale(1.2)' : 'scale(1)',
+        }}
+      >
         {done && (
-          <svg className="animate-check_bounce" width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M2.5 7L5.5 10L11.5 4" stroke="#0A0A0F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <svg
+            className="animate-check_bounce"
+            width="13" height="13" viewBox="0 0 13 13" fill="none"
+          >
+            <path d="M2.5 6.5L5 9L10.5 4" stroke="#0A0A0F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         )}
       </div>
@@ -75,7 +98,7 @@ export default function HabitCard({ habit, today, onToggle }: Props) {
 
 function calculateStreak(completions: string[], today: string): number {
   let streak = 0
-  let d = new Date(today)
+  const d = new Date(today)
   while (true) {
     const dateStr = d.toISOString().split('T')[0]
     if (!completions.includes(dateStr)) break
