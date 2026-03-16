@@ -156,7 +156,12 @@ input[type='checkbox'] {
 
 /* Mobile bottom nav blur */
 .bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background: rgba(10, 10, 15, 0.85);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
+  transform: translate3d(0, 0, 0);
 }
