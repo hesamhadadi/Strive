@@ -164,5 +164,4 @@ input[type='checkbox'] {
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   transform: translate3d(0, 0, 0);
-  will-change: transform;
 }
