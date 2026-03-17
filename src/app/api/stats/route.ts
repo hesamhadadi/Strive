@@ -54,13 +54,50 @@ export async function GET() {
     checkDate = subDays(checkDate, 1)
   }
 
+  const personalBestStreak = calculatePersonalBest(goodHabits)
+
   return NextResponse.json({
     totalGoodHabits: goodHabits.length,
     completedToday,
     streak,
+    personalBestStreak,
     badHabitStats,
     weeklyData,
     todosCompleted: todos.filter(t => t.completed).length,
     todosPending: todos.filter(t => !t.completed).length,
   })
+}
+
+function calculatePersonalBest(goodHabits: any[]): number {
+  if (goodHabits.length === 0) return 0
+
+  const completionCountByDay = new Map<string, number>()
+  for (const habit of goodHabits) {
+    for (const date of habit.completions) {
+      completionCountByDay.set(date, (completionCountByDay.get(date) || 0) + 1)
+    }
+  }
+
+  const completeDays = [...completionCountByDay.entries()]
+    .filter(([, count]) => count === goodHabits.length)
+    .map(([date]) => date)
+    .sort()
+
+  if (completeDays.length === 0) return 0
+
+  let best = 1
+  let current = 1
+  for (let i = 1; i < completeDays.length; i++) {
+    const prev = new Date(completeDays[i - 1])
+    const next = new Date(completeDays[i])
+    prev.setDate(prev.getDate() + 1)
+    if (prev.toISOString().split('T')[0] === next.toISOString().split('T')[0]) {
+      current++
+      if (current > best) best = current
+    } else {
+      current = 1
+    }
+  }
+
+  return best
 }

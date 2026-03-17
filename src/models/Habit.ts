@@ -7,6 +7,7 @@ export interface IHabit extends Document {
   icon: string
   color: string
   category: string
+  weeklyTarget?: number
   // For bad habits
   costPerDay?: number
   currency?: string
@@ -26,6 +27,7 @@ const HabitSchema = new Schema<IHabit>({
   icon: { type: String, required: true },
   color: { type: String, required: true },
   category: { type: String, required: true },
+  weeklyTarget: { type: Number, min: 1, max: 7 },
   costPerDay: { type: Number },
   currency: { type: String, default: '€' },
   startQuitDate: { type: String },

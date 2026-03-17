@@ -17,6 +17,7 @@ interface Habit {
   color: string
   category: string
   completions: string[]
+  weeklyTarget?: number
   cleanDays: string[]
   costPerDay?: number
   currency?: string
@@ -66,6 +67,7 @@ export default function DashboardPage() {
 
   // Calculate streak
   const streak = calcStreak(goodHabits, today)
+  const personalBestStreak = calcPersonalBest(goodHabits)
 
   // Total money saved from bad habits
   const totalSaved = badHabits.reduce((sum, h) => sum + h.cleanDays.length * (h.costPerDay || 0), 0)
@@ -89,6 +91,9 @@ export default function DashboardPage() {
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
           {streak > 1 && (
             <Chip icon="🔥" label={`${streak}-day streak`} color="#FF6B35" />
+          )}
+          {personalBestStreak > streak && (
+            <Chip icon="🏅" label={`Best ${personalBestStreak} days`} color="#FFD60A" />
           )}
           {badHabits.length > 0 && totalSaved > 0 && (
             <Chip icon="💰" label={`${currency}${totalSaved.toFixed(0)} saved`} color="#00FF88" />
@@ -272,4 +277,38 @@ function calcStreak(goodHabits: Habit[], today: string): number {
     d.setDate(d.getDate() - 1)
   }
   return streak
+}
+
+function calcPersonalBest(goodHabits: Habit[]): number {
+  if (goodHabits.length === 0) return 0
+
+  const completionCountByDay = new Map<string, number>()
+  for (const habit of goodHabits) {
+    for (const date of habit.completions) {
+      completionCountByDay.set(date, (completionCountByDay.get(date) || 0) + 1)
+    }
+  }
+
+  const completeDays = [...completionCountByDay.entries()]
+    .filter(([, count]) => count === goodHabits.length)
+    .map(([date]) => date)
+    .sort()
+
+  if (completeDays.length === 0) return 0
+
+  let best = 1
+  let current = 1
+  for (let i = 1; i < completeDays.length; i++) {
+    const prev = new Date(completeDays[i - 1])
+    const next = new Date(completeDays[i])
+    prev.setDate(prev.getDate() + 1)
+    if (prev.toISOString().split('T')[0] === next.toISOString().split('T')[0]) {
+      current++
+      if (current > best) best = current
+    } else {
+      current = 1
+    }
+  }
+
+  return best
 }

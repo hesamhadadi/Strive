@@ -7,6 +7,7 @@ interface Habit {
   color: string
   category: string
   completions: string[]
+  weeklyTarget?: number
 }
 
 interface Props {
@@ -19,6 +20,8 @@ interface Props {
 export default function HabitCard({ habit, today, onToggle, highlight }: Props) {
   const done = habit.completions.includes(today)
   const streak = calculateStreak(habit.completions, today)
+  const weeklyCompleted = countThisWeek(habit.completions, today)
+  const weeklyTarget = habit.weeklyTarget || 7
 
   return (
     <button
@@ -70,6 +73,9 @@ export default function HabitCard({ habit, today, onToggle, highlight }: Props) 
               🔥 {streak}d
             </span>
           )}
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)' }}>
+            {weeklyCompleted}/{weeklyTarget} wk
+          </span>
         </div>
       </div>
 
@@ -94,6 +100,21 @@ export default function HabitCard({ habit, today, onToggle, highlight }: Props) 
       </div>
     </button>
   )
+}
+
+function countThisWeek(completions: string[], today: string): number {
+  const current = new Date(today)
+  const day = current.getDay()
+  const diffToMonday = (day + 6) % 7
+  const monday = new Date(current)
+  monday.setDate(current.getDate() - diffToMonday)
+  monday.setHours(0, 0, 0, 0)
+
+  return completions.filter(date => {
+    const d = new Date(date)
+    d.setHours(0, 0, 0, 0)
+    return d >= monday && d <= current
+  }).length
 }
 
 function calculateStreak(completions: string[], today: string): number {
