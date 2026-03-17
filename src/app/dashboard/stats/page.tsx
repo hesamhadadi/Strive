@@ -6,6 +6,7 @@ interface StatsData {
   totalGoodHabits: number
   completedToday: number
   streak: number
+  personalBestStreak: number
   badHabitStats: { id: string; name: string; cleanDays: number; moneySaved: number; currency: string }[]
   weeklyData: { date: string; completed: number; total: number }[]
   todosCompleted: number
@@ -49,7 +50,7 @@ export default function StatsPage() {
         <StatCard
           label="Current Streak"
           value={`${stats.streak}`}
-          sub={stats.streak === 1 ? 'day' : 'days'}
+          sub={`Best ${stats.personalBestStreak}d`}
           color="#FF6B35"
           icon="🔥"
         />

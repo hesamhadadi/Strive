@@ -14,6 +14,7 @@ interface Habit {
   cleanDays: string[]
   costPerDay?: number
   currency?: string
+  weeklyTarget?: number
 }
 
 const ICONS = ['💧', '💊', '🏃', '📚', '🧘', '🍎', '😴', '🚶', '🏋️', '✍️', '🎯', '🌿', '☕', '🚴', '🧘‍♂️', '🎨', '🎵', '🙏', '🚭', '🍺', '📵', '🍔']
@@ -28,6 +29,7 @@ export default function HabitsPage() {
     name: '', type: 'good' as 'good' | 'bad',
     icon: '⭐', color: '#00FF88', category: 'Health',
     costPerDay: 5, currency: '€',
+    weeklyTarget: 7,
   })
 
   useEffect(() => {
@@ -36,15 +38,16 @@ export default function HabitsPage() {
 
   async function addHabit(e: React.FormEvent) {
     e.preventDefault()
+    const payload = form.type === 'good' ? form : { ...form, weeklyTarget: undefined }
     const res = await fetch('/api/habits', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify(payload),
     })
     const habit = await res.json()
     setHabits(prev => [...prev, habit])
     setShowForm(false)
-    setForm({ name: '', type: 'good', icon: '⭐', color: '#00FF88', category: 'Health', costPerDay: 5, currency: '€' })
+    setForm({ name: '', type: 'good', icon: '⭐', color: '#00FF88', category: 'Health', costPerDay: 5, currency: '€', weeklyTarget: 7 })
   }
 
   async function deleteHabit(id: string) {
@@ -203,6 +206,17 @@ export default function HabitsPage() {
                 </div>
               )}
 
+              {form.type === 'good' && (
+                <div>
+                  <label className="text-xs text-white/40 mb-1 block">Weekly target (days)</label>
+                  <input type="number" min={1} max={7} value={form.weeklyTarget}
+                    onChange={e => setForm(f => ({ ...f, weeklyTarget: Math.max(1, Math.min(7, +e.target.value || 1)) }))}
+                    className="w-full px-3 py-2.5 rounded-xl text-white text-sm outline-none"
+                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+                  />
+                </div>
+              )}
+
               <button type="submit"
                 className="w-full py-3.5 rounded-xl font-semibold text-sm text-ink transition-all"
                 style={{ background: 'linear-gradient(135deg, #00FF88, #00D4FF)' }}>
@@ -226,7 +240,7 @@ function HabitRow({ habit, onDelete }: { habit: Habit; onDelete: () => void }) {
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-white truncate">{habit.name}</p>
-        <p className="text-xs text-white/35">{habit.category} • {habit.type === 'bad' ? `${habit.currency}${habit.costPerDay}/day` : `${habit.completions.length} completions`}</p>
+        <p className="text-xs text-white/35">{habit.category} • {habit.type === 'bad' ? `${habit.currency}${habit.costPerDay}/day` : `${habit.completions.length} completions${habit.weeklyTarget ? ` • ${habit.weeklyTarget}/week` : ''}`}</p>
       </div>
       <button onClick={onDelete}
         className="opacity-0 group-hover:opacity-100 transition-all w-8 h-8 flex items-center justify-center rounded-xl hover:bg-red-500/10">
