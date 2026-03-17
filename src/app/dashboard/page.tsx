@@ -289,7 +289,7 @@ function calcPersonalBest(goodHabits: Habit[]): number {
     }
   }
 
-  const completeDays = [...completionCountByDay.entries()]
+  const completeDays = Array.from(completionCountByDay.entries())
     .filter(([, count]) => count === goodHabits.length)
     .map(([date]) => date)
     .sort()
