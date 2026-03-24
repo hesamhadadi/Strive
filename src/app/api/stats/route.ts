@@ -128,7 +128,7 @@ export async function GET() {
 function calculatePersonalBest(goodHabits: any[], freezeDates: string[]): number {
   if (goodHabits.length === 0) return 0
 
-  const completeDaySet = new Set<string>()
+  const streakEligibleDaysSet = new Set<string>()
   const completionCountByDay = new Map<string, number>()
   for (const habit of goodHabits) {
     for (const date of habit.completions) {
@@ -139,10 +139,10 @@ function calculatePersonalBest(goodHabits: any[], freezeDates: string[]): number
   Array.from(completionCountByDay.entries())
     .filter(([, count]) => count === goodHabits.length)
     .map(([date]) => date)
-    .forEach(date => completeDaySet.add(date))
+    .forEach(date => streakEligibleDaysSet.add(date))
 
-  freezeDates.forEach(date => completeDaySet.add(date))
-  const completeDays = Array.from(completeDaySet).sort()
+  freezeDates.forEach(date => streakEligibleDaysSet.add(date))
+  const completeDays = Array.from(streakEligibleDaysSet).sort()
 
   if (completeDays.length === 0) return 0
 

@@ -10,6 +10,8 @@ import QuickTodo from '@/components/todos/QuickTodo'
 import TimeBlockSection from '@/components/habits/TimeBlockSection'
 import MissedHabitSheet from '@/components/habits/MissedHabitSheet'
 
+const MISSED_HABIT_PROMPT_HOUR = 23
+
 interface Habit {
   _id: string
   name: string
@@ -42,7 +44,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const hour = new Date().getHours()
-    if (hour >= 23) {
+    if (hour >= MISSED_HABIT_PROMPT_HOUR) {
       fetch('/api/habits/missed')
         .then(r => r.json())
         .then(d => {
@@ -87,6 +89,13 @@ export default function DashboardPage() {
     })
   }
 
+  function openMissedJournalForHabit(habitId: string) {
+    const habit = goodHabits.find(h => h._id === habitId)
+    if (!habit) return
+    setMissedHabits([{ _id: habit._id, name: habit.name, icon: habit.icon, color: habit.color }])
+    setMissedSheetOpen(true)
+  }
+
   const goodHabits = habits.filter(h => h.type === 'good')
   const badHabits = habits.filter(h => h.type === 'bad')
   const completedCount = goodHabits.filter(h => h.completions.includes(today)).length
@@ -114,8 +123,12 @@ export default function DashboardPage() {
   }
   goodHabits.forEach(h => {
     const block = h.timeOfDay || 'anytime'
-    if (block in blockMap) blockMap[block as keyof typeof blockMap].push(h)
-    else blockMap.anytime.push(h)
+    if (block in blockMap) {
+      blockMap[block as keyof typeof blockMap].push(h)
+    } else {
+      console.warn('Unknown habit timeOfDay. Falling back to anytime.', { habitId: h._id, block })
+      blockMap.anytime.push(h)
+    }
   })
 
   return (
@@ -185,12 +198,7 @@ export default function DashboardPage() {
               alwaysOpen
               onToggleHabit={(id) => toggleHabit(id, 'toggle_completion')}
               highlightHabitId={justChecked}
-              onOpenMissedJournal={(habitId) => {
-                const habit = goodHabits.find(h => h._id === habitId)
-                if (!habit) return
-                setMissedHabits([{ _id: habit._id, name: habit.name, icon: habit.icon, color: habit.color }])
-                setMissedSheetOpen(true)
-              }}
+              onOpenMissedJournal={openMissedJournalForHabit}
             />
             <TimeBlockSection
               title="Morning"
@@ -200,12 +208,7 @@ export default function DashboardPage() {
               defaultExpanded={currentTimeBlock === 'morning'}
               onToggleHabit={(id) => toggleHabit(id, 'toggle_completion')}
               highlightHabitId={justChecked}
-              onOpenMissedJournal={(habitId) => {
-                const habit = goodHabits.find(h => h._id === habitId)
-                if (!habit) return
-                setMissedHabits([{ _id: habit._id, name: habit.name, icon: habit.icon, color: habit.color }])
-                setMissedSheetOpen(true)
-              }}
+              onOpenMissedJournal={openMissedJournalForHabit}
             />
             <TimeBlockSection
               title="Afternoon"
@@ -215,12 +218,7 @@ export default function DashboardPage() {
               defaultExpanded={currentTimeBlock === 'afternoon'}
               onToggleHabit={(id) => toggleHabit(id, 'toggle_completion')}
               highlightHabitId={justChecked}
-              onOpenMissedJournal={(habitId) => {
-                const habit = goodHabits.find(h => h._id === habitId)
-                if (!habit) return
-                setMissedHabits([{ _id: habit._id, name: habit.name, icon: habit.icon, color: habit.color }])
-                setMissedSheetOpen(true)
-              }}
+              onOpenMissedJournal={openMissedJournalForHabit}
             />
             <TimeBlockSection
               title="Evening"
@@ -230,12 +228,7 @@ export default function DashboardPage() {
               defaultExpanded={currentTimeBlock === 'evening'}
               onToggleHabit={(id) => toggleHabit(id, 'toggle_completion')}
               highlightHabitId={justChecked}
-              onOpenMissedJournal={(habitId) => {
-                const habit = goodHabits.find(h => h._id === habitId)
-                if (!habit) return
-                setMissedHabits([{ _id: habit._id, name: habit.name, icon: habit.icon, color: habit.color }])
-                setMissedSheetOpen(true)
-              }}
+              onOpenMissedJournal={openMissedJournalForHabit}
             />
           </div>
         )}

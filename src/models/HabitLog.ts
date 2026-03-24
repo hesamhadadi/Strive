@@ -1,11 +1,12 @@
 import mongoose, { Schema, Document } from 'mongoose'
+import { HABIT_LOG_REASONS, type HabitLogReason } from '@/lib/habitLogReasons'
 
 export interface IHabitLog extends Document {
   habitId: string
   userId: string
   date: string
   completed: boolean
-  reason?: 'tired' | 'no_time' | 'sick' | 'forgot' | 'other'
+  reason?: HabitLogReason
   note?: string
   completedAt?: Date
 }
@@ -16,7 +17,7 @@ const HabitLogSchema = new Schema<IHabitLog>(
     userId: { type: String, required: true, index: true },
     date: { type: String, required: true, index: true },
     completed: { type: Boolean, required: true },
-    reason: { type: String, enum: ['tired', 'no_time', 'sick', 'forgot', 'other'] },
+    reason: { type: String, enum: HABIT_LOG_REASONS },
     note: { type: String, maxlength: 120 },
     completedAt: { type: Date },
   },

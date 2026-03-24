@@ -21,19 +21,13 @@ interface Props {
 export default function HabitCard({ habit, today, onToggle, highlight, onMissedLog }: Props) {
   const done = habit.completions.includes(today)
   const streak = calculateStreak(habit.completions, today)
-  const bestStreak = calculateBestStreak(habit.completions)
+  const personalBestStreak = calculateBestStreak(habit.completions)
   const weeklyCompleted = countThisWeek(habit.completions, today)
   const weeklyTarget = habit.weeklyTarget || 7
 
   return (
     <div
-      onClick={onToggle}
       className="w-full flex items-center gap-3.5 p-4 rounded-2xl text-left group transition-all duration-200"
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') onToggle()
-      }}
       style={{
         background: done
           ? `linear-gradient(135deg, ${habit.color}14, ${habit.color}06)`
@@ -80,8 +74,8 @@ export default function HabitCard({ habit, today, onToggle, highlight, onMissedL
               🔥 {streak}d
             </span>
           )}
-          {bestStreak > streak && (
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)' }}>Best {bestStreak}d</span>
+          {personalBestStreak > streak && (
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)' }}>Best {personalBestStreak}d</span>
           )}
           <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)' }}>
             {weeklyCompleted}/{weeklyTarget} wk
@@ -161,7 +155,7 @@ function calculateStreak(completions: string[], today: string): number {
 
 function calculateBestStreak(completions: string[]): number {
   if (completions.length === 0) return 0
-  const dates = [...new Set(completions)].sort()
+  const dates = Array.from(new Set(completions)).sort()
   let best = 1
   let current = 1
   for (let i = 1; i < dates.length; i++) {

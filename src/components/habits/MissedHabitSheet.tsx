@@ -1,16 +1,9 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { HABIT_LOG_REASONS, HABIT_LOG_REASON_LABELS, type HabitLogReason } from '@/lib/habitLogReasons'
 
-const REASONS = [
-  { label: '😴 Tired', value: 'tired' },
-  { label: '🏃 No time', value: 'no_time' },
-  { label: '🤒 Sick', value: 'sick' },
-  { label: '😞 Forgot', value: 'forgot' },
-  { label: '✍️ Other', value: 'other' },
-] as const
-
-type Reason = (typeof REASONS)[number]['value']
+const REASONS = HABIT_LOG_REASONS.map(value => ({ value, label: HABIT_LOG_REASON_LABELS[value] }))
 
 interface HabitInfo {
   _id: string
@@ -22,12 +15,12 @@ interface Props {
   open: boolean
   habits: HabitInfo[]
   onClose: () => void
-  onSubmit: (habitId: string, reason: Reason, note?: string) => Promise<void>
+  onSubmit: (habitId: string, reason: HabitLogReason, note?: string) => Promise<void>
 }
 
 export default function MissedHabitSheet({ open, habits, onClose, onSubmit }: Props) {
   const [selectedHabitId, setSelectedHabitId] = useState<string>('')
-  const [reason, setReason] = useState<Reason>('tired')
+  const [reason, setReason] = useState<HabitLogReason>('tired')
   const [note, setNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
