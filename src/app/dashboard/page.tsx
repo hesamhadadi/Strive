@@ -1,13 +1,16 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { ArrowRight } from 'lucide-react'
 import Link from 'next/link'
-import HabitCard from '@/components/habits/HabitCard'
 import BadHabitCard from '@/components/habits/BadHabitCard'
 import StatsRing from '@/components/habits/StatsRing'
 import QuickTodo from '@/components/todos/QuickTodo'
+import TimeBlockSection from '@/components/habits/TimeBlockSection'
+import MissedHabitSheet from '@/components/habits/MissedHabitSheet'
+
+const MISSED_HABIT_PROMPT_HOUR = 23
 
 interface Habit {
   _id: string
@@ -21,12 +24,15 @@ interface Habit {
   cleanDays: string[]
   costPerDay?: number
   currency?: string
+  timeOfDay?: 'morning' | 'afternoon' | 'evening' | 'anytime'
 }
 
 export default function DashboardPage() {
   const [habits, setHabits] = useState<Habit[]>([])
   const [loading, setLoading] = useState(true)
   const [justChecked, setJustChecked] = useState<string | null>(null)
+  const [missedSheetOpen, setMissedSheetOpen] = useState(false)
+  const [missedHabits, setMissedHabits] = useState<Array<{ _id: string; name: string; icon: string; color: string }>>([])
   const today = format(new Date(), 'yyyy-MM-dd')
 
   useEffect(() => {
@@ -34,6 +40,21 @@ export default function DashboardPage() {
       .then(r => r.json())
       .then(d => { setHabits(Array.isArray(d) ? d : []); setLoading(false) })
       .catch(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    const hour = new Date().getHours()
+    if (hour >= MISSED_HABIT_PROMPT_HOUR) {
+      fetch('/api/habits/missed')
+        .then(r => r.json())
+        .then(d => {
+          if (d?.count > 0) {
+            setMissedHabits(Array.isArray(d.habits) ? d.habits : [])
+            setMissedSheetOpen(true)
+          }
+        })
+        .catch(() => null)
+    }
   }, [])
 
   async function toggleHabit(id: string, action: string) {
@@ -60,6 +81,21 @@ export default function DashboardPage() {
     })
   }
 
+  async function logMissedHabit(habitId: string, reason: string, note?: string) {
+    await fetch(`/api/habits/${habitId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date: today, action: 'log_missed', reason, note }),
+    })
+  }
+
+  function openMissedJournalForHabit(habitId: string) {
+    const habit = goodHabits.find(h => h._id === habitId)
+    if (!habit) return
+    setMissedHabits([{ _id: habit._id, name: habit.name, icon: habit.icon, color: habit.color }])
+    setMissedSheetOpen(true)
+  }
+
   const goodHabits = habits.filter(h => h.type === 'good')
   const badHabits = habits.filter(h => h.type === 'bad')
   const completedCount = goodHabits.filter(h => h.completions.includes(today)).length
@@ -72,6 +108,28 @@ export default function DashboardPage() {
   // Total money saved from bad habits
   const totalSaved = badHabits.reduce((sum, h) => sum + h.cleanDays.length * (h.costPerDay || 0), 0)
   const currency = badHabits[0]?.currency || '€'
+  const currentTimeBlock = useMemo(() => {
+    const h = new Date().getHours()
+    if (h >= 6 && h < 12) return 'morning'
+    if (h >= 12 && h < 18) return 'afternoon'
+    return 'evening'
+  }, [])
+
+  const blockMap: Record<'morning' | 'afternoon' | 'evening' | 'anytime', Habit[]> = {
+    morning: [],
+    afternoon: [],
+    evening: [],
+    anytime: [],
+  }
+  goodHabits.forEach(h => {
+    const block = h.timeOfDay || 'anytime'
+    if (block in blockMap) {
+      blockMap[block as keyof typeof blockMap].push(h)
+    } else {
+      console.warn('Unknown habit timeOfDay. Falling back to anytime.', { habitId: h._id, block })
+      blockMap.anytime.push(h)
+    }
+  })
 
   return (
     <div className="max-w-lg mx-auto px-4 space-y-5 pb-4">
@@ -131,22 +189,47 @@ export default function DashboardPage() {
           />
         ) : (
           <div className="space-y-2.5">
-            {goodHabits.map((habit, idx) => (
-              <div
-                key={habit._id}
-                style={{
-                  animation: 'slide_up 0.4s ease-out both',
-                  animationDelay: `${idx * 0.06}s`,
-                }}
-              >
-                <HabitCard
-                  habit={habit}
-                  today={today}
-                  onToggle={() => toggleHabit(habit._id, 'toggle_completion')}
-                  highlight={justChecked === habit._id}
-                />
-              </div>
-            ))}
+            <TimeBlockSection
+              title="Anytime"
+              emoji="🕒"
+              habits={blockMap.anytime}
+              today={today}
+              defaultExpanded
+              alwaysOpen
+              onToggleHabit={(id) => toggleHabit(id, 'toggle_completion')}
+              highlightHabitId={justChecked}
+              onOpenMissedJournal={openMissedJournalForHabit}
+            />
+            <TimeBlockSection
+              title="Morning"
+              emoji="🌅"
+              habits={blockMap.morning}
+              today={today}
+              defaultExpanded={currentTimeBlock === 'morning'}
+              onToggleHabit={(id) => toggleHabit(id, 'toggle_completion')}
+              highlightHabitId={justChecked}
+              onOpenMissedJournal={openMissedJournalForHabit}
+            />
+            <TimeBlockSection
+              title="Afternoon"
+              emoji="☀️"
+              habits={blockMap.afternoon}
+              today={today}
+              defaultExpanded={currentTimeBlock === 'afternoon'}
+              onToggleHabit={(id) => toggleHabit(id, 'toggle_completion')}
+              highlightHabitId={justChecked}
+              onOpenMissedJournal={openMissedJournalForHabit}
+            />
+            <TimeBlockSection
+              title="Evening"
+              emoji="🌙"
+              habits={blockMap.evening}
+              today={today}
+              defaultExpanded={currentTimeBlock === 'evening'}
+              onToggleHabit={(id) => toggleHabit(id, 'toggle_completion')}
+              highlightHabitId={justChecked}
+              onOpenMissedJournal={openMissedJournalForHabit}
+            />
           </div>
         )}
       </section>
@@ -187,6 +270,13 @@ export default function DashboardPage() {
         />
         <QuickTodo />
       </section>
+
+      <MissedHabitSheet
+        open={missedSheetOpen}
+        habits={missedHabits}
+        onClose={() => setMissedSheetOpen(false)}
+        onSubmit={logMissedHabit}
+      />
 
     </div>
   )

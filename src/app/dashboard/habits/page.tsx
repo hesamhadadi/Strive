@@ -15,6 +15,7 @@ interface Habit {
   costPerDay?: number
   currency?: string
   weeklyTarget?: number
+  timeOfDay?: 'morning' | 'afternoon' | 'evening' | 'anytime'
 }
 
 const ICONS = ['💧', '💊', '🏃', '📚', '🧘', '🍎', '😴', '🚶', '🏋️', '✍️', '🎯', '🌿', '☕', '🚴', '🧘‍♂️', '🎨', '🎵', '🙏', '🚭', '🍺', '📵', '🍔']
@@ -30,6 +31,7 @@ export default function HabitsPage() {
     icon: '⭐', color: '#00FF88', category: 'Health',
     costPerDay: 5, currency: '€',
     weeklyTarget: 7,
+    timeOfDay: 'anytime' as 'morning' | 'afternoon' | 'evening' | 'anytime',
   })
 
   useEffect(() => {
@@ -47,7 +49,7 @@ export default function HabitsPage() {
     const habit = await res.json()
     setHabits(prev => [...prev, habit])
     setShowForm(false)
-    setForm({ name: '', type: 'good', icon: '⭐', color: '#00FF88', category: 'Health', costPerDay: 5, currency: '€', weeklyTarget: 7 })
+    setForm({ name: '', type: 'good', icon: '⭐', color: '#00FF88', category: 'Health', costPerDay: 5, currency: '€', weeklyTarget: 7, timeOfDay: 'anytime' })
   }
 
   async function deleteHabit(id: string) {
@@ -184,6 +186,17 @@ export default function HabitsPage() {
                 {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
 
+              {form.type === 'good' && (
+                <select value={form.timeOfDay} onChange={e => setForm(f => ({ ...f, timeOfDay: e.target.value as any }))}
+                  className="w-full px-4 py-3 rounded-xl text-white text-sm outline-none"
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <option value="morning">🌅 Morning</option>
+                  <option value="afternoon">☀️ Afternoon</option>
+                  <option value="evening">🌙 Evening</option>
+                  <option value="anytime">🕒 Anytime</option>
+                </select>
+              )}
+
               {/* Bad habit extras */}
               {form.type === 'bad' && (
                 <div className="flex gap-2">
@@ -240,7 +253,7 @@ function HabitRow({ habit, onDelete }: { habit: Habit; onDelete: () => void }) {
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-white truncate">{habit.name}</p>
-        <p className="text-xs text-white/35">{habit.category} • {habit.type === 'bad' ? `${habit.currency}${habit.costPerDay}/day` : `${habit.completions.length} completions${habit.weeklyTarget ? ` • ${habit.weeklyTarget}/week` : ''}`}</p>
+        <p className="text-xs text-white/35">{habit.category} • {habit.type === 'bad' ? `${habit.currency}${habit.costPerDay}/day` : `${habit.completions.length} completions${habit.weeklyTarget ? ` • ${habit.weeklyTarget}/week` : ''}${habit.timeOfDay ? ` • ${habit.timeOfDay}` : ''}`}</p>
       </div>
       <button onClick={onDelete}
         className="opacity-0 group-hover:opacity-100 transition-all w-8 h-8 flex items-center justify-center rounded-xl hover:bg-red-500/10">
