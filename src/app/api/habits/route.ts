@@ -23,6 +23,7 @@ export async function POST(req: Request) {
   const habit = await Habit.create({
     ...body,
     userId: (session.user as any).id,
+    timeOfDay: body.timeOfDay || 'anytime',
     completions: [],
     cleanDays: [],
   })

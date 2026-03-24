@@ -11,6 +11,10 @@ interface StatsData {
   weeklyData: { date: string; completed: number; total: number }[]
   todosCompleted: number
   todosPending: number
+  streakFreeze: { usedThisWeek: number; remainingThisWeek: number; freezeDates: string[] }
+  heatmap: { date: string; count: number; intensity: number }[]
+  streakMilestones: { days: number; earned: boolean }[]
+  missedPatternText: string | null
 }
 
 export default function StatsPage() {
@@ -20,6 +24,12 @@ export default function StatsPage() {
   useEffect(() => {
     fetch('/api/stats').then(r => r.json()).then(d => { setStats(d); setLoading(false) })
   }, [])
+
+  async function useFreeze() {
+    await fetch('/api/streak/freeze', { method: 'POST' })
+    const fresh = await fetch('/api/stats').then(r => r.json())
+    setStats(fresh)
+  }
 
   if (loading) {
     return (
@@ -70,6 +80,22 @@ export default function StatsPage() {
           color="#00D4FF"
           icon="💰"
         />
+      </div>
+
+      <div className="p-4 rounded-2xl flex items-center justify-between"
+        style={{ background: 'rgba(26,26,36,0.9)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <div>
+          <p className="text-sm text-white font-semibold">Weekly streak freeze</p>
+          <p className="text-xs text-white/45">{stats.streakFreeze.remainingThisWeek} remaining this week</p>
+        </div>
+        <button
+          disabled={stats.streakFreeze.remainingThisWeek === 0}
+          onClick={useFreeze}
+          className="px-3 py-2 rounded-xl text-xs font-semibold disabled:opacity-40"
+          style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }}
+        >
+          Use freeze
+        </button>
       </div>
 
       {/* Weekly bar chart */}
@@ -133,6 +159,57 @@ export default function StatsPage() {
           </div>
         </div>
       )}
+
+      {stats.missedPatternText && (
+        <div className="p-4 rounded-2xl"
+          style={{ background: 'rgba(26,26,36,0.9)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <p className="text-xs text-white/50 mb-1">Missed-habit pattern</p>
+          <p className="text-sm text-white/85">{stats.missedPatternText}</p>
+        </div>
+      )}
+
+      <div className="p-5 rounded-3xl"
+        style={{ background: 'rgba(26,26,36,0.9)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <h2 className="font-semibold text-sm text-white mb-4">Streak Heatmap (Last 3 Months)</h2>
+        <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(15, minmax(0, 1fr))' }}>
+          {stats.heatmap.map(day => (
+            <div
+              key={day.date}
+              title={`${day.date} • ${day.count} completed`}
+              className="w-3.5 h-3.5 rounded-[3px]"
+              style={{
+                background:
+                  day.intensity === 0 ? 'rgba(255,255,255,0.06)' :
+                  day.intensity === 1 ? 'rgba(0,255,136,0.25)' :
+                  day.intensity === 2 ? 'rgba(0,255,136,0.45)' :
+                  day.intensity === 3 ? 'rgba(0,255,136,0.65)' :
+                  '#00FF88',
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="p-5 rounded-3xl"
+        style={{ background: 'rgba(26,26,36,0.9)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <h2 className="font-semibold text-sm text-white mb-4">Streak Milestones</h2>
+        <div className="grid grid-cols-4 gap-2">
+          {stats.streakMilestones.map(m => (
+            <div
+              key={m.days}
+              className="rounded-xl p-2 text-center"
+              style={{
+                background: m.earned ? 'rgba(0,255,136,0.16)' : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${m.earned ? 'rgba(0,255,136,0.4)' : 'rgba(255,255,255,0.08)'}`,
+              }}
+            >
+              <p className="text-xs font-semibold" style={{ color: m.earned ? '#00FF88' : 'rgba(255,255,255,0.5)' }}>
+                {m.days}d
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* Motivational footer */}
       <div className="py-4 text-center">

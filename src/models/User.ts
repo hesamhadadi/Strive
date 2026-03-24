@@ -10,6 +10,10 @@ export interface IUser extends Document {
   streak: number
   longestStreak: number
   lastActiveDate?: string
+  freezesUsedInWeek: number
+  freezeWeekKey?: string
+  freezeDates: string[]
+  streakMilestones: number[]
 }
 
 const UserSchema = new Schema<IUser>({
@@ -21,6 +25,10 @@ const UserSchema = new Schema<IUser>({
   streak: { type: Number, default: 0 },
   longestStreak: { type: Number, default: 0 },
   lastActiveDate: { type: String },
+  freezesUsedInWeek: { type: Number, default: 0 },
+  freezeWeekKey: { type: String },
+  freezeDates: [{ type: String }],
+  streakMilestones: [{ type: Number }],
   createdAt: { type: Date, default: Date.now },
 })
 
