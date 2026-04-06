@@ -79,3 +79,15 @@ export function isReminderDue(reminderTime?: string) {
   due.setHours(hours, minutes, 0, 0)
   return now >= due
 }
+
+export function getReminderDelayMs(reminderTime?: string) {
+  if (!reminderTime) return null
+  const [hours, minutes] = reminderTime.split(':').map(Number)
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null
+
+  const now = new Date()
+  const due = new Date()
+  due.setHours(hours, minutes, 0, 0)
+
+  return Math.max(due.getTime() - now.getTime(), 0)
+}
