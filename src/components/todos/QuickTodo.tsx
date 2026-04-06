@@ -11,6 +11,7 @@ interface Todo {
   priority: 'low' | 'medium' | 'high'
   reminderEnabled?: boolean
   reminderTime?: string
+  reminderTimezone?: string
 }
 
 const PRIORITY_COLORS = {
@@ -54,7 +55,7 @@ export default function QuickTodo() {
     const res = await fetch('/api/todos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: input.trim(), priority, reminderEnabled, reminderTime }),
+      body: JSON.stringify({ title: input.trim(), priority, reminderEnabled, reminderTime, reminderTimezone: timeZone }),
     })
     const todo = await res.json()
     setTodos(prev => [todo, ...prev])

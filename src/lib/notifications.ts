@@ -6,6 +6,13 @@ export type TodoNotificationPayload = {
   tag: string
 }
 
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const rawData = window.atob(base64)
+  return Uint8Array.from(Array.from(rawData).map(char => char.charCodeAt(0)))
+}
+
 export function supportsNotifications() {
   return typeof window !== 'undefined' && 'Notification' in window
 }
@@ -67,6 +74,31 @@ export async function sendBrowserNotification(payload: TodoNotificationPayload) 
   } catch {
     return false
   }
+}
+
+export async function subscribeToWebPush(publicKey: string) {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    throw new Error('Push messaging is not supported in this browser')
+  }
+
+  const registration = await navigator.serviceWorker.ready
+  const existingSubscription = await registration.pushManager.getSubscription()
+  if (existingSubscription) return existingSubscription
+
+  return registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(publicKey),
+  })
+}
+
+export async function unsubscribeFromWebPush() {
+  if (!('serviceWorker' in navigator)) return false
+  const registration = await navigator.serviceWorker.ready
+  const subscription = await registration.pushManager.getSubscription()
+  if (!subscription) return false
+  const endpoint = subscription.endpoint
+  await subscription.unsubscribe()
+  return endpoint
 }
 
 export function isReminderDue(reminderTime?: string) {

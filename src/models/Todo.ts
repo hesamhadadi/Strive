@@ -8,6 +8,7 @@ export interface ITodo extends Document {
   dueDate?: string
   reminderEnabled: boolean
   reminderTime?: string
+  reminderTimezone?: string
   lastReminderDate?: string
   completedAt?: Date
   createdAt: Date
@@ -22,6 +23,7 @@ const TodoSchema = new Schema<ITodo>({
   dueDate: { type: String },
   reminderEnabled: { type: Boolean, default: false },
   reminderTime: { type: String },
+  reminderTimezone: { type: String },
   lastReminderDate: { type: String },
   completedAt: { type: Date },
   tags: [{ type: String }],

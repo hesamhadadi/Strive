@@ -57,7 +57,7 @@ export default function TodosPage() {
     const res = await fetch('/api/todos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: input.trim(), priority, reminderEnabled, reminderTime }),
+      body: JSON.stringify({ title: input.trim(), priority, reminderEnabled, reminderTime, reminderTimezone: timeZone }),
     })
     const t = await res.json()
     setTodos(prev => [t, ...prev])

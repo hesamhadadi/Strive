@@ -25,6 +25,7 @@ export async function POST(req: Request) {
     userId: (session.user as any).id,
     reminderEnabled: body.reminderEnabled ?? false,
     reminderTime: body.reminderEnabled ? body.reminderTime || '19:00' : '',
+    reminderTimezone: body.reminderEnabled ? body.reminderTimezone || 'UTC' : '',
     lastReminderDate: '',
   })
   return NextResponse.json(todo, { status: 201 })
