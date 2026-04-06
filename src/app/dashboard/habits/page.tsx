@@ -401,7 +401,7 @@ function HabitRow({ habit, today, onOpen, onDelete }: { habit: Habit; today: str
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }} onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="fixed inset-0 z-[80] flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }} onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="w-full max-w-lg rounded-t-3xl p-6 animate-slide_up max-h-[90dvh] overflow-y-auto" style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.08)' }}>
         <div className="flex items-center justify-between mb-6">
           <h3 className="font-display text-xl font-bold">{title}</h3>
