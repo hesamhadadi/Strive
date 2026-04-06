@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
-import { isReminderDue, requestNotificationPermission, sendBrowserNotification, supportsNotifications } from '@/lib/notifications'
+import { isReminderDue, sendBrowserNotification, supportsNotifications } from '@/lib/notifications'
 
 interface TodoReminder {
   _id: string
@@ -24,8 +24,17 @@ export default function NotificationProvider() {
     }
 
     setPermission(Notification.permission)
-    if (Notification.permission === 'default') {
-      requestNotificationPermission().then(result => setPermission(result))
+  }, [])
+
+  useEffect(() => {
+    if (!supportsNotifications()) return
+    const syncPermission = () => setPermission(Notification.permission)
+    syncPermission()
+    window.addEventListener('focus', syncPermission)
+    document.addEventListener('visibilitychange', syncPermission)
+    return () => {
+      window.removeEventListener('focus', syncPermission)
+      document.removeEventListener('visibilitychange', syncPermission)
     }
   }, [])
 
@@ -63,10 +72,14 @@ export default function NotificationProvider() {
 
     checkReminders()
     const interval = window.setInterval(checkReminders, 60_000)
+    window.addEventListener('focus', checkReminders)
+    document.addEventListener('visibilitychange', checkReminders)
 
     return () => {
       cancelled = true
       window.clearInterval(interval)
+      window.removeEventListener('focus', checkReminders)
+      document.removeEventListener('visibilitychange', checkReminders)
     }
   }, [permission])
 

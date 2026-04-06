@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Plus, Trash2, CheckCircle2, Circle } from 'lucide-react'
-import { requestNotificationPermission, sendBrowserNotification, supportsNotifications } from '@/lib/notifications'
+import { getLocalDefaultReminderTime, getResolvedTimeZone, requestNotificationPermission, sendBrowserNotification, supportsNotifications } from '@/lib/notifications'
 
 interface Todo {
   _id: string
@@ -28,10 +28,27 @@ export default function TodosPage() {
   const [loading, setLoading] = useState(true)
   const [reminderEnabled, setReminderEnabled] = useState(false)
   const [reminderTime, setReminderTime] = useState('19:00')
+  const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>('default')
+  const [timeZone, setTimeZone] = useState('local time')
 
   useEffect(() => {
     fetch('/api/todos').then(r => r.json()).then(d => { setTodos(d); setLoading(false) })
+    setReminderTime(getLocalDefaultReminderTime())
+    setTimeZone(getResolvedTimeZone())
+    setPermission(supportsNotifications() ? Notification.permission : 'unsupported')
   }, [])
+
+  async function enableNotifications() {
+    const result = await requestNotificationPermission()
+    setPermission(result)
+    if (result === 'granted') {
+      await sendBrowserNotification({
+        title: 'Notifications enabled',
+        body: 'Task reminders will use your local time zone.',
+        tag: `notification-enabled-${Date.now()}`,
+      })
+    }
+  }
 
   async function add(e: React.FormEvent) {
     e.preventDefault()
@@ -45,7 +62,7 @@ export default function TodosPage() {
     setTodos(prev => [t, ...prev])
     setInput('')
     setReminderEnabled(false)
-    setReminderTime('19:00')
+    setReminderTime(getLocalDefaultReminderTime())
   }
 
   async function toggle(id: string, completed: boolean) {
@@ -115,9 +132,26 @@ export default function TodosPage() {
               {P_LABEL[p]}
             </button>
           ))}
+          {permission !== 'granted' && (
+            <button
+              type="button"
+              onClick={enableNotifications}
+              className="px-3 py-1.5 rounded-lg text-[10px] font-semibold"
+              style={{ background: 'rgba(255,214,10,0.14)', color: '#FFD60A', border: '1px solid rgba(255,214,10,0.25)' }}
+            >
+              Enable notifications
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => setReminderEnabled(prev => !prev)}
+            onClick={async () => {
+              if (!reminderEnabled && permission !== 'granted' && supportsNotifications()) {
+                const result = await requestNotificationPermission()
+                setPermission(result)
+                if (result !== 'granted') return
+              }
+              setReminderEnabled(prev => !prev)
+            }}
             className="px-3 py-1.5 rounded-lg text-[10px] font-semibold"
             style={reminderEnabled
               ? { background: 'rgba(0,212,255,0.15)', color: '#00D4FF', border: '1px solid rgba(0,212,255,0.25)' }
@@ -134,6 +168,9 @@ export default function TodosPage() {
             />
           )}
         </div>
+        {reminderEnabled && (
+          <p className="text-[11px] text-white/35">Reminder time uses your browser timezone: {timeZone}</p>
+        )}
       </form>
 
       {/* Filter tabs */}

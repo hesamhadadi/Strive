@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
-import { requestNotificationPermission, sendBrowserNotification, supportsNotifications } from '@/lib/notifications'
+import { getLocalDefaultReminderTime, getResolvedTimeZone, requestNotificationPermission, sendBrowserNotification, supportsNotifications } from '@/lib/notifications'
 
 interface Todo {
   _id: string
@@ -25,10 +25,27 @@ export default function QuickTodo() {
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium')
   const [reminderEnabled, setReminderEnabled] = useState(false)
   const [reminderTime, setReminderTime] = useState('19:00')
+  const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>('default')
+  const [timeZone, setTimeZone] = useState('local time')
 
   useEffect(() => {
     fetch('/api/todos').then(r => r.json()).then(d => setTodos(d.slice(0, 5)))
+    setReminderTime(getLocalDefaultReminderTime())
+    setTimeZone(getResolvedTimeZone())
+    setPermission(supportsNotifications() ? Notification.permission : 'unsupported')
   }, [])
+
+  async function enableNotifications() {
+    const result = await requestNotificationPermission()
+    setPermission(result)
+    if (result === 'granted') {
+      await sendBrowserNotification({
+        title: 'Notifications enabled',
+        body: 'Task reminders will use your local time zone.',
+        tag: `notification-enabled-${Date.now()}`,
+      })
+    }
+  }
 
   async function addTodo(e: React.FormEvent) {
     e.preventDefault()
@@ -43,7 +60,7 @@ export default function QuickTodo() {
     setTodos(prev => [todo, ...prev])
     setInput('')
     setReminderEnabled(false)
-    setReminderTime('19:00')
+    setReminderTime(getLocalDefaultReminderTime())
   }
 
   async function toggleTodo(id: string, completed: boolean) {
@@ -108,9 +125,26 @@ export default function QuickTodo() {
         </div>
 
         <div className="flex items-center gap-2">
+          {permission !== 'granted' && (
+            <button
+              type="button"
+              onClick={enableNotifications}
+              className="px-3 py-2 rounded-xl text-xs font-semibold"
+              style={{ background: 'rgba(255,214,10,0.14)', color: '#FFD60A', border: '1px solid rgba(255,214,10,0.25)' }}
+            >
+              Enable notifications
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => setReminderEnabled(prev => !prev)}
+            onClick={async () => {
+              if (!reminderEnabled && permission !== 'granted' && supportsNotifications()) {
+                const result = await requestNotificationPermission()
+                setPermission(result)
+                if (result !== 'granted') return
+              }
+              setReminderEnabled(prev => !prev)
+            }}
             className="px-3 py-2 rounded-xl text-xs font-semibold"
             style={reminderEnabled
               ? { background: 'rgba(0,212,255,0.14)', color: '#00D4FF', border: '1px solid rgba(0,212,255,0.25)' }
@@ -127,6 +161,9 @@ export default function QuickTodo() {
             />
           )}
         </div>
+        {reminderEnabled && (
+          <p className="text-[11px] text-white/35">Reminder time uses your browser timezone: {timeZone}</p>
+        )}
       </form>
 
       {/* List */}

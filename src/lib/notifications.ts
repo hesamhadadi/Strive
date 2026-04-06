@@ -10,6 +10,31 @@ export function supportsNotifications() {
   return typeof window !== 'undefined' && 'Notification' in window
 }
 
+export function getLocalDefaultReminderTime() {
+  const now = new Date()
+  const rounded = new Date(now)
+  const minutes = rounded.getMinutes()
+  const nextQuarter = Math.ceil((minutes + 1) / 15) * 15
+  rounded.setSeconds(0, 0)
+
+  if (nextQuarter >= 60) {
+    rounded.setHours(rounded.getHours() + 1, 0, 0, 0)
+  } else {
+    rounded.setMinutes(nextQuarter, 0, 0)
+  }
+
+  return rounded.toLocaleTimeString('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+}
+
+export function getResolvedTimeZone() {
+  if (typeof Intl === 'undefined') return 'local time'
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'local time'
+}
+
 export async function requestNotificationPermission() {
   if (!supportsNotifications()) return 'denied'
   if (Notification.permission === 'granted') return 'granted'
