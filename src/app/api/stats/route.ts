@@ -1,12 +1,21 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { format, subDays } from 'date-fns'
 import { authOptions } from '@/lib/auth'
 import connectDB from '@/lib/mongodb'
 import Habit from '@/models/Habit'
 import Todo from '@/models/Todo'
 import User from '@/models/User'
 import HabitLog from '@/models/HabitLog'
-import { format, subDays } from 'date-fns'
+import {
+  getCompletionRate,
+  getCurrentStreak,
+  getDurationForDate,
+  getPeriodStreak,
+  getTwoDayRuleStatus,
+  isHabitScheduledOnDate,
+  type HabitInsightShape,
+} from '@/lib/habitInsights'
 
 export async function GET() {
   const session = await getServerSession(authOptions)
@@ -15,40 +24,37 @@ export async function GET() {
   const userId = (session.user as any).id
   await connectDB()
 
-  const habits = await Habit.find({ userId })
-  const todos = await Todo.find({ userId })
+  const habits = (await Habit.find({ userId }).lean()) as unknown as HabitInsightShape[]
+  const todos = await Todo.find({ userId }).lean()
   const user = await User.findById(userId)
-
   const today = format(new Date(), 'yyyy-MM-dd')
 
-  // Good habits completed today
-  const goodHabits = habits.filter(h => h.type === 'good')
-  const completedToday = goodHabits.filter(h => h.completions.includes(today)).length
+  const goodHabits = habits.filter(habit => habit.type === 'good')
+  const badHabits = habits.filter(habit => habit.type === 'bad')
+  const completedToday = goodHabits.filter(habit => habit.completions.includes(today)).length
+  const atRiskHabits = goodHabits
+    .map(habit => ({
+      id: String((habit as any)._id),
+      name: habit.name,
+      ...getTwoDayRuleStatus(habit, today),
+    }))
+    .filter(habit => habit.atRisk || habit.broken)
 
-  // Bad habits: calculate savings + health for smoking
-  const badHabits = habits.filter(h => h.type === 'bad')
-  const badHabitStats = badHabits.map(h => {
-    const cleanCount = h.cleanDays.length
-    const saved = cleanCount * (h.costPerDay || 0)
-    return {
-      id: h._id,
-      name: h.name,
-      cleanDays: cleanCount,
-      moneySaved: saved,
-      currency: h.currency || '€',
-    }
+  const weeklyData = Array.from({ length: 7 }, (_, index) => {
+    const date = format(subDays(new Date(), 6 - index), 'yyyy-MM-dd')
+    const completed = goodHabits.filter(habit => habit.completions.includes(date)).length
+    const total = goodHabits.filter(habit => isHabitScheduledOnDate(habit, date)).length
+    return { date, completed, total }
   })
 
-  // Weekly completion rate (last 7 days)
-  const weeklyData = Array.from({ length: 7 }, (_, i) => {
-    const date = format(subDays(new Date(), 6 - i), 'yyyy-MM-dd')
-    const completed = goodHabits.filter(h => h.completions.includes(date)).length
-    return { date, completed, total: goodHabits.length }
+  const monthlyHeatmap = Array.from({ length: 28 }, (_, index) => {
+    const date = format(subDays(new Date(), 27 - index), 'yyyy-MM-dd')
+    const completed = goodHabits.filter(habit => habit.completions.includes(date)).length
+    const total = goodHabits.filter(habit => isHabitScheduledOnDate(habit, date)).length
+    return { date, completed, total }
   })
 
   const freezeDates: string[] = Array.isArray(user?.freezeDates) ? user.freezeDates : []
-
-  // Current streak (supports freeze dates)
   let streak = 0
   let checkDate = new Date()
   while (true) {
@@ -60,11 +66,48 @@ export async function GET() {
     checkDate = subDays(checkDate, 1)
   }
 
+  const totalSaved = badHabits.reduce(
+    (sum, habit) => sum + habit.cleanDays.length * (habit.costPerDay || 0),
+    0
+  )
+  const avgMood = (() => {
+    const moods = goodHabits.flatMap(habit => (habit.moodLogs || []).map(log => log.mood))
+    return moods.length === 0 ? null : Number((moods.reduce((sum, mood) => sum + mood, 0) / moods.length).toFixed(1))
+  })()
+  const timerMinutesThisWeek = goodHabits.reduce((sum, habit) => (
+    sum + Array.from({ length: 7 }, (_, index) => {
+      const date = format(subDays(new Date(), index), 'yyyy-MM-dd')
+      return getDurationForDate(habit, date)
+    }).reduce((acc, value) => acc + value, 0)
+  ), 0)
+  const completionRate30d = goodHabits.length === 0
+    ? 0
+    : Math.round(goodHabits.reduce((sum, habit) => sum + getCompletionRate(habit, today, 30), 0) / goodHabits.length)
+  const overallDailyStreak = goodHabits.length === 0
+    ? 0
+    : Math.min(...goodHabits.map(habit => getCurrentStreak(habit, today)))
+  const bestHabit = goodHabits
+    .map(habit => ({
+      id: String((habit as any)._id),
+      name: habit.name,
+      streak: getCurrentStreak(habit, today),
+      weeklyStreak: getPeriodStreak(habit, today, 'week'),
+      monthlyStreak: getPeriodStreak(habit, today, 'month'),
+      completionRate: getCompletionRate(habit, today, 30),
+    }))
+    .sort((a, b) => b.completionRate - a.completionRate || b.streak - a.streak)[0] || null
+
+  const xp = goodHabits.reduce((sum, habit) => (
+    sum +
+    habit.completions.length * 10 +
+    getPeriodStreak(habit, today, 'week') * 25 +
+    getPeriodStreak(habit, today, 'month') * 40
+  ), 0)
+
   const personalBestStreak = calculatePersonalBest(goodHabits, freezeDates)
   const milestones = [7, 14, 30, 60, 90, 180, 365]
   const earnedMilestones = milestones.filter(m => personalBestStreak >= m)
 
-  // persist streak summary + milestones on user profile
   if (user) {
     user.streak = streak
     if ((user.longestStreak || 0) < personalBestStreak) user.longestStreak = personalBestStreak
@@ -72,7 +115,6 @@ export async function GET() {
     await user.save()
   }
 
-  // heatmap (last 90 days)
   const heatmap = Array.from({ length: 90 }, (_, i) => {
     const date = format(subDays(new Date(), 89 - i), 'yyyy-MM-dd')
     const completed = goodHabits.filter(h => h.completions.includes(date)).length
@@ -87,7 +129,7 @@ export async function GET() {
     userId,
     completed: false,
     reason: { $exists: true },
-  })
+  }).lean()
 
   const reasonCounts = recentMissedLogs.reduce((acc: Record<string, number>, log: any) => {
     const key = log.reason || 'other'
@@ -110,10 +152,16 @@ export async function GET() {
     completedToday,
     streak,
     personalBestStreak,
-    badHabitStats,
+    overallDailyStreak,
+    weeklyStreak: goodHabits.length === 0 ? 0 : Math.min(...goodHabits.map(habit => getPeriodStreak(habit, today, 'week'))),
+    monthlyStreak: goodHabits.length === 0 ? 0 : Math.min(...goodHabits.map(habit => getPeriodStreak(habit, today, 'month'))),
+    atRiskHabits,
+    totalSaved,
+    currency: badHabits[0]?.currency || '€',
     weeklyData,
-    todosCompleted: todos.filter(t => t.completed).length,
-    todosPending: todos.filter(t => !t.completed).length,
+    monthlyHeatmap,
+    todosCompleted: todos.filter(todo => todo.completed).length,
+    todosPending: todos.filter(todo => !todo.completed).length,
     streakFreeze: {
       usedThisWeek: user?.freezesUsedInWeek || 0,
       remainingThisWeek: Math.max(0, 1 - (user?.freezesUsedInWeek || 0)),
@@ -122,10 +170,16 @@ export async function GET() {
     heatmap,
     streakMilestones: milestones.map(days => ({ days, earned: earnedMilestones.includes(days) })),
     missedPatternText,
+    timerMinutesThisWeek,
+    completionRate30d,
+    avgMood,
+    level: Math.floor(xp / 250) + 1,
+    xp,
+    bestHabit,
   })
 }
 
-function calculatePersonalBest(goodHabits: any[], freezeDates: string[]): number {
+function calculatePersonalBest(goodHabits: HabitInsightShape[], freezeDates: string[]): number {
   if (goodHabits.length === 0) return 0
 
   const streakEligibleDaysSet = new Set<string>()

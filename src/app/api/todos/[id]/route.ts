@@ -14,6 +14,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const update: any = { ...body }
   if (body.completed === true) update.completedAt = new Date()
   if (body.completed === false) update.completedAt = null
+  if (body.completed === true) update.lastReminderDate = ''
 
   const todo = await Todo.findOneAndUpdate(
     { _id: params.id, userId: (session.user as any).id },

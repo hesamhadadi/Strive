@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Plus, Trash2, CheckCircle2, Circle } from 'lucide-react'
+import { requestNotificationPermission, sendBrowserNotification, supportsNotifications } from '@/lib/notifications'
 
 interface Todo {
   _id: string
@@ -9,6 +10,9 @@ interface Todo {
   completed: boolean
   priority: 'low' | 'medium' | 'high'
   dueDate?: string
+  reminderEnabled?: boolean
+  reminderTime?: string
+  lastReminderDate?: string
   tags: string[]
   createdAt: string
 }
@@ -22,6 +26,8 @@ export default function TodosPage() {
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium')
   const [filter, setFilter] = useState<'all' | 'active' | 'done'>('active')
   const [loading, setLoading] = useState(true)
+  const [reminderEnabled, setReminderEnabled] = useState(false)
+  const [reminderTime, setReminderTime] = useState('19:00')
 
   useEffect(() => {
     fetch('/api/todos').then(r => r.json()).then(d => { setTodos(d); setLoading(false) })
@@ -33,20 +39,33 @@ export default function TodosPage() {
     const res = await fetch('/api/todos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: input.trim(), priority }),
+      body: JSON.stringify({ title: input.trim(), priority, reminderEnabled, reminderTime }),
     })
     const t = await res.json()
     setTodos(prev => [t, ...prev])
     setInput('')
+    setReminderEnabled(false)
+    setReminderTime('19:00')
   }
 
   async function toggle(id: string, completed: boolean) {
     setTodos(prev => prev.map(t => t._id === id ? { ...t, completed: !t.completed } : t))
-    await fetch(`/api/todos/${id}`, {
+    const response = await fetch(`/api/todos/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ completed: !completed }),
     })
+    const updated = await response.json()
+    if (!completed && supportsNotifications()) {
+      if (Notification.permission !== 'granted') {
+        await requestNotificationPermission()
+      }
+      await sendBrowserNotification({
+        title: 'Task completed',
+        body: `Nice. "${updated.title}" is done.`,
+        tag: `todo-complete-${updated._id}-${Date.now()}`,
+      })
+    }
   }
 
   async function remove(id: string) {
@@ -71,15 +90,21 @@ export default function TodosPage() {
 
       {/* Add form */}
       <form onSubmit={add}
-        className="flex gap-2 p-3 rounded-2xl"
+        className="space-y-3 p-3 rounded-2xl"
         style={{ background: 'rgba(26,26,36,0.9)', border: '1px solid rgba(255,255,255,0.07)' }}>
-        <input
-          value={input} onChange={e => setInput(e.target.value)}
-          placeholder="What needs to be done?"
-          className="flex-1 bg-transparent text-white text-sm outline-none font-body placeholder:text-white/25"
-        />
-        {/* Priority */}
-        <div className="flex items-center gap-1">
+        <div className="flex gap-2">
+          <input
+            value={input} onChange={e => setInput(e.target.value)}
+            placeholder="What needs to be done?"
+            className="flex-1 bg-transparent text-white text-sm outline-none font-body placeholder:text-white/25"
+          />
+          <button type="submit"
+            className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0 transition-all active:scale-95"
+            style={{ background: 'linear-gradient(135deg, #00FF88, #00D4FF)' }}>
+            <Plus size={18} className="text-ink" strokeWidth={2.5} />
+          </button>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           {(['low', 'medium', 'high'] as const).map(p => (
             <button key={p} type="button" onClick={() => setPriority(p)}
               className="px-2 py-1 rounded-lg text-[10px] font-semibold transition-all"
@@ -90,12 +115,25 @@ export default function TodosPage() {
               {P_LABEL[p]}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => setReminderEnabled(prev => !prev)}
+            className="px-3 py-1.5 rounded-lg text-[10px] font-semibold"
+            style={reminderEnabled
+              ? { background: 'rgba(0,212,255,0.15)', color: '#00D4FF', border: '1px solid rgba(0,212,255,0.25)' }
+              : { background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.35)', border: '1px solid rgba(255,255,255,0.08)' }}
+          >
+            {reminderEnabled ? 'Reminder on' : 'Reminder off'}
+          </button>
+          {reminderEnabled && (
+            <input
+              type="time"
+              value={reminderTime}
+              onChange={e => setReminderTime(e.target.value)}
+              className="px-3 py-1.5 rounded-lg text-[10px] text-white outline-none bg-white/5 border border-white/10"
+            />
+          )}
         </div>
-        <button type="submit"
-          className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0 transition-all active:scale-95"
-          style={{ background: 'linear-gradient(135deg, #00FF88, #00D4FF)' }}>
-          <Plus size={18} className="text-ink" strokeWidth={2.5} />
-        </button>
       </form>
 
       {/* Filter tabs */}
@@ -149,6 +187,11 @@ export default function TodosPage() {
               </span>
 
               <div className="flex items-center gap-2">
+                {todo.reminderEnabled && todo.reminderTime ? (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-sky-400/10 text-sky-300">
+                    {todo.reminderTime}
+                  </span>
+                ) : null}
                 <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
                   style={{ background: P_COLOR[todo.priority] + '15', color: P_COLOR[todo.priority] }}>
                   {P_LABEL[todo.priority]}

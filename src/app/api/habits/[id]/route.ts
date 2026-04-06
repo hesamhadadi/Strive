@@ -13,17 +13,23 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { date, action, reason, note } = await req.json()
+  const { date, action, reason, note, minutes, mood, updates } = await req.json()
   const safeNote = typeof note === 'string' ? note.trim().slice(0, 120) : undefined
   const safeReason = typeof reason === 'string' && isHabitLogReason(reason) ? reason : undefined
   await connectDB()
 
-  const habit = await Habit.findOne({ _id: params.id, userId: (session.user as any).id })
+  const userId = (session.user as any).id
+  const habit = await Habit.findOne({ _id: params.id, userId })
   if (!habit) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  if (!habit.durationLogs) habit.durationLogs = []
+  if (!habit.moodLogs) habit.moodLogs = []
+  if (!habit.scheduledDays) habit.scheduledDays = []
+  if (!habit.monthlyDays) habit.monthlyDays = []
 
   const habitLogQuery = {
     habitId: habit._id.toString(),
-    userId: (session.user as any).id,
+    userId,
     date,
   }
 
@@ -72,6 +78,58 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     )
+  }
+
+  if (action === 'log_duration' && date && minutes) {
+    const index = habit.durationLogs.findIndex((log: { date: string }) => log.date === date)
+    if (index > -1) {
+      habit.durationLogs[index].minutes += Number(minutes)
+    } else {
+      habit.durationLogs.push({ date, minutes: Number(minutes) })
+    }
+
+    if (habit.durationTargetMinutes && habit.durationTargetMinutes > 0) {
+      const totalMinutes = habit.durationLogs
+        .filter((log: { date: string }) => log.date === date)
+        .reduce((sum: number, log: { minutes: number }) => sum + log.minutes, 0)
+
+      const completionIndex = habit.completions.indexOf(date)
+      if (totalMinutes >= habit.durationTargetMinutes && completionIndex === -1) {
+        habit.completions.push(date)
+      }
+    }
+  }
+
+  if (action === 'log_mood' && date && mood) {
+    const index = habit.moodLogs.findIndex((log: { date: string }) => log.date === date)
+    if (index > -1) {
+      habit.moodLogs[index].mood = Number(mood)
+      habit.moodLogs[index].note = note || ''
+    } else {
+      habit.moodLogs.push({ date, mood: Number(mood), note: note || '' })
+    }
+  }
+
+  if (action === 'update_meta' && updates) {
+    const allowedKeys = [
+      'notes',
+      'frequency',
+      'scheduledDays',
+      'monthlyDays',
+      'targetCount',
+      'durationTargetMinutes',
+      'reminderTime',
+      'locationLabel',
+      'twoDayRule',
+      'timeOfDay',
+      'weeklyTarget',
+    ]
+
+    for (const key of allowedKeys) {
+      if (key in updates) {
+        ;(habit as any)[key] = updates[key]
+      }
+    }
   }
 
   await habit.save()

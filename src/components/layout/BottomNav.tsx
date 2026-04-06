@@ -2,11 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Sparkles, CheckSquare, BarChart2 } from 'lucide-react'
+import { LayoutDashboard, Sparkles, CheckSquare, BarChart2, CalendarDays } from 'lucide-react'
 
 const tabs = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Today' },
   { href: '/dashboard/habits', icon: Sparkles, label: 'Habits' },
+  { href: '/dashboard/schedule', icon: CalendarDays, label: 'Schedule' },
   { href: '/dashboard/todos', icon: CheckSquare, label: 'Tasks' },
   { href: '/dashboard/stats', icon: BarChart2, label: 'Stats' },
 ]
@@ -23,7 +24,7 @@ export default function BottomNav() {
             const active = pathname === href
             return (
               <Link key={href} href={href}
-                className="flex flex-col items-center gap-1 px-5 py-2.5 rounded-xl transition-all duration-200 relative"
+                className="flex flex-col items-center gap-1 px-3 py-2.5 rounded-xl transition-all duration-200 relative"
                 style={active ? { background: 'rgba(0,255,136,0.1)' } : {}}>
                 {active && (
                   <div className="absolute inset-0 rounded-xl"

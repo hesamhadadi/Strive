@@ -2,12 +2,15 @@
 
 import { useEffect, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
+import { requestNotificationPermission, sendBrowserNotification, supportsNotifications } from '@/lib/notifications'
 
 interface Todo {
   _id: string
   title: string
   completed: boolean
   priority: 'low' | 'medium' | 'high'
+  reminderEnabled?: boolean
+  reminderTime?: string
 }
 
 const PRIORITY_COLORS = {
@@ -20,6 +23,8 @@ export default function QuickTodo() {
   const [todos, setTodos] = useState<Todo[]>([])
   const [input, setInput] = useState('')
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium')
+  const [reminderEnabled, setReminderEnabled] = useState(false)
+  const [reminderTime, setReminderTime] = useState('19:00')
 
   useEffect(() => {
     fetch('/api/todos').then(r => r.json()).then(d => setTodos(d.slice(0, 5)))
@@ -32,20 +37,33 @@ export default function QuickTodo() {
     const res = await fetch('/api/todos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: input.trim(), priority }),
+      body: JSON.stringify({ title: input.trim(), priority, reminderEnabled, reminderTime }),
     })
     const todo = await res.json()
     setTodos(prev => [todo, ...prev])
     setInput('')
+    setReminderEnabled(false)
+    setReminderTime('19:00')
   }
 
   async function toggleTodo(id: string, completed: boolean) {
     setTodos(prev => prev.map(t => t._id === id ? { ...t, completed: !t.completed } : t))
-    await fetch(`/api/todos/${id}`, {
+    const response = await fetch(`/api/todos/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ completed: !completed }),
     })
+    const updated = await response.json()
+    if (!completed && supportsNotifications()) {
+      if (Notification.permission !== 'granted') {
+        await requestNotificationPermission()
+      }
+      await sendBrowserNotification({
+        title: 'Task completed',
+        body: `Nice. "${updated.title}" is done.`,
+        tag: `todo-complete-${updated._id}-${Date.now()}`,
+      })
+    }
   }
 
   async function deleteTodo(id: string) {
@@ -56,37 +74,59 @@ export default function QuickTodo() {
   return (
     <div className="space-y-3">
       {/* Input */}
-      <form onSubmit={addTodo} className="flex gap-2">
-        <input
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          placeholder="Add a task..."
-          className="flex-1 px-4 py-2.5 rounded-xl text-sm text-white outline-none transition-all font-body"
-          style={{
-            background: 'rgba(26,26,36,0.9)',
-            border: '1px solid rgba(255,255,255,0.07)',
-          }}
-          onFocus={e => e.target.style.borderColor = 'rgba(0,255,136,0.3)'}
-          onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.07)'}
-        />
-        {/* Priority selector */}
-        <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.07)' }}>
-          {(['low', 'medium', 'high'] as const).map(p => (
-            <button key={p} type="button" onClick={() => setPriority(p)}
-              className="w-7 transition-all"
-              style={{
-                background: priority === p ? PRIORITY_COLORS[p] + '30' : 'rgba(26,26,36,0.9)',
-                borderBottom: priority === p ? `2px solid ${PRIORITY_COLORS[p]}` : '2px solid transparent',
-              }}>
-              <span style={{ color: PRIORITY_COLORS[p], fontSize: '8px' }}>●</span>
-            </button>
-          ))}
+      <form onSubmit={addTodo} className="space-y-2">
+        <div className="flex gap-2">
+          <input
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            placeholder="Add a task..."
+            className="flex-1 px-4 py-2.5 rounded-xl text-sm text-white outline-none transition-all font-body"
+            style={{
+              background: 'rgba(26,26,36,0.9)',
+              border: '1px solid rgba(255,255,255,0.07)',
+            }}
+            onFocus={e => e.target.style.borderColor = 'rgba(0,255,136,0.3)'}
+            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.07)'}
+          />
+          <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.07)' }}>
+            {(['low', 'medium', 'high'] as const).map(p => (
+              <button key={p} type="button" onClick={() => setPriority(p)}
+                className="w-7 transition-all"
+                style={{
+                  background: priority === p ? PRIORITY_COLORS[p] + '30' : 'rgba(26,26,36,0.9)',
+                  borderBottom: priority === p ? `2px solid ${PRIORITY_COLORS[p]}` : '2px solid transparent',
+                }}>
+                <span style={{ color: PRIORITY_COLORS[p], fontSize: '8px' }}>●</span>
+              </button>
+            ))}
+          </div>
+          <button type="submit"
+            className="w-10 h-10 flex items-center justify-center rounded-xl transition-all active:scale-95"
+            style={{ background: 'linear-gradient(135deg, #00FF88, #00D4FF)' }}>
+            <Plus size={18} className="text-ink" strokeWidth={2.5} />
+          </button>
         </div>
-        <button type="submit"
-          className="w-10 h-10 flex items-center justify-center rounded-xl transition-all active:scale-95"
-          style={{ background: 'linear-gradient(135deg, #00FF88, #00D4FF)' }}>
-          <Plus size={18} className="text-ink" strokeWidth={2.5} />
-        </button>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setReminderEnabled(prev => !prev)}
+            className="px-3 py-2 rounded-xl text-xs font-semibold"
+            style={reminderEnabled
+              ? { background: 'rgba(0,212,255,0.14)', color: '#00D4FF', border: '1px solid rgba(0,212,255,0.25)' }
+              : { background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.45)', border: '1px solid rgba(255,255,255,0.07)' }}
+          >
+            {reminderEnabled ? 'Reminder on' : 'Reminder off'}
+          </button>
+          {reminderEnabled && (
+            <input
+              type="time"
+              value={reminderTime}
+              onChange={e => setReminderTime(e.target.value)}
+              className="px-3 py-2 rounded-xl text-xs text-white outline-none bg-white/5 border border-white/10"
+            />
+          )}
+        </div>
       </form>
 
       {/* List */}

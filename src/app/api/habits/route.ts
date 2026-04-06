@@ -26,6 +26,17 @@ export async function POST(req: Request) {
     timeOfDay: body.timeOfDay || 'anytime',
     completions: [],
     cleanDays: [],
+    moodLogs: [],
+    durationLogs: [],
+    frequency: body.frequency || 'daily',
+    scheduledDays: body.scheduledDays || [],
+    monthlyDays: body.monthlyDays || [],
+    targetCount: body.targetCount || 1,
+    durationTargetMinutes: body.durationTargetMinutes || undefined,
+    reminderTime: body.reminderTime || '',
+    locationLabel: body.locationLabel || '',
+    notes: body.notes || '',
+    twoDayRule: body.twoDayRule ?? true,
   })
 
   return NextResponse.json(habit, { status: 201 })

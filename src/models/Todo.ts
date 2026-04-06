@@ -6,6 +6,9 @@ export interface ITodo extends Document {
   completed: boolean
   priority: 'low' | 'medium' | 'high'
   dueDate?: string
+  reminderEnabled: boolean
+  reminderTime?: string
+  lastReminderDate?: string
   completedAt?: Date
   createdAt: Date
   tags: string[]
@@ -17,6 +20,9 @@ const TodoSchema = new Schema<ITodo>({
   completed: { type: Boolean, default: false },
   priority: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
   dueDate: { type: String },
+  reminderEnabled: { type: Boolean, default: false },
+  reminderTime: { type: String },
+  lastReminderDate: { type: String },
   completedAt: { type: Date },
   tags: [{ type: String }],
   createdAt: { type: Date, default: Date.now },

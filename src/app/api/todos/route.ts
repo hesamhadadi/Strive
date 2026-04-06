@@ -20,6 +20,12 @@ export async function POST(req: Request) {
   const body = await req.json()
   await connectDB()
 
-  const todo = await Todo.create({ ...body, userId: (session.user as any).id })
+  const todo = await Todo.create({
+    ...body,
+    userId: (session.user as any).id,
+    reminderEnabled: body.reminderEnabled ?? false,
+    reminderTime: body.reminderEnabled ? body.reminderTime || '19:00' : '',
+    lastReminderDate: '',
+  })
   return NextResponse.json(todo, { status: 201 })
 }

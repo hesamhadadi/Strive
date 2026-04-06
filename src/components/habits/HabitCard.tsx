@@ -1,13 +1,19 @@
 'use client'
 
+import { getDurationForDate } from '@/lib/habitInsights'
+
 interface Habit {
   _id: string
   name: string
+  type: 'good' | 'bad'
   icon: string
   color: string
   category: string
   completions: string[]
+  cleanDays: string[]
   weeklyTarget?: number
+  durationTargetMinutes?: number
+  durationLogs?: { date: string; minutes: number }[]
 }
 
 interface Props {
@@ -24,6 +30,7 @@ export default function HabitCard({ habit, today, onToggle, highlight, onMissedL
   const personalBestStreak = calculateBestStreak(habit.completions)
   const weeklyCompleted = countThisWeek(habit.completions, today)
   const weeklyTarget = habit.weeklyTarget || 7
+  const duration = getDurationForDate(habit, today)
 
   return (
     <div
@@ -41,7 +48,6 @@ export default function HabitCard({ habit, today, onToggle, highlight, onMissedL
         transition: 'all 0.25s ease',
       }}
     >
-      {/* Icon bubble */}
       <div
         className="flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center text-xl"
         style={{
@@ -53,7 +59,6 @@ export default function HabitCard({ habit, today, onToggle, highlight, onMissedL
         {habit.icon}
       </div>
 
-      {/* Text */}
       <div className="flex-1 min-w-0 text-left">
         <p
           className="font-medium text-sm font-body truncate"
@@ -64,13 +69,13 @@ export default function HabitCard({ habit, today, onToggle, highlight, onMissedL
         >
           {habit.name}
         </p>
-        <div className="flex items-center gap-2 mt-0.5">
+        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)' }}>{habit.category}</span>
+          {habit.durationTargetMinutes ? (
+            <span style={{ fontSize: 11, color: '#00D4FF' }}>⏱ {duration}/{habit.durationTargetMinutes}m</span>
+          ) : null}
           {streak > 1 && (
-            <span
-              className="flex items-center gap-0.5 font-semibold"
-              style={{ fontSize: 11, color: '#FF6B35' }}
-            >
+            <span className="flex items-center gap-0.5 font-semibold" style={{ fontSize: 11, color: '#FF6B35' }}>
               🔥 {streak}d
             </span>
           )}
@@ -83,7 +88,6 @@ export default function HabitCard({ habit, today, onToggle, highlight, onMissedL
         </div>
       </div>
 
-      {/* Checkbox */}
       <div className="flex-shrink-0 flex items-center gap-1.5">
         {!done && onMissedLog && (
           <button
@@ -113,10 +117,7 @@ export default function HabitCard({ habit, today, onToggle, highlight, onMissedL
           }}
         >
           {done && (
-            <svg
-              className="animate-check_bounce"
-              width="13" height="13" viewBox="0 0 13 13" fill="none"
-            >
+            <svg className="animate-check_bounce" width="13" height="13" viewBox="0 0 13 13" fill="none">
               <path d="M2.5 6.5L5 9L10.5 4" stroke="#0A0A0F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           )}

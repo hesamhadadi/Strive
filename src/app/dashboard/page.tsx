@@ -9,6 +9,7 @@ import StatsRing from '@/components/habits/StatsRing'
 import QuickTodo from '@/components/todos/QuickTodo'
 import TimeBlockSection from '@/components/habits/TimeBlockSection'
 import MissedHabitSheet from '@/components/habits/MissedHabitSheet'
+import { getDurationForDate, getPeriodStreak, getTwoDayRuleStatus } from '@/lib/habitInsights'
 
 const MISSED_HABIT_PROMPT_HOUR = 23
 
@@ -22,6 +23,17 @@ interface Habit {
   completions: string[]
   weeklyTarget?: number
   cleanDays: string[]
+  frequency?: 'daily' | 'weekly' | 'monthly'
+  scheduledDays?: number[]
+  monthlyDays?: number[]
+  targetCount?: number
+  durationTargetMinutes?: number
+  durationLogs?: { date: string; minutes: number }[]
+  reminderTime?: string
+  locationLabel?: string
+  notes?: string
+  moodLogs?: { date: string; mood: number; note?: string }[]
+  twoDayRule?: boolean
   costPerDay?: number
   currency?: string
   timeOfDay?: 'morning' | 'afternoon' | 'evening' | 'anytime'
@@ -100,14 +112,15 @@ export default function DashboardPage() {
   const badHabits = habits.filter(h => h.type === 'bad')
   const completedCount = goodHabits.filter(h => h.completions.includes(today)).length
   const totalGood = goodHabits.length
-
-  // Calculate streak
   const streak = calcStreak(goodHabits, today)
   const personalBestStreak = calcPersonalBest(goodHabits)
-
-  // Total money saved from bad habits
+  const weeklyStreak = goodHabits.length === 0 ? 0 : Math.min(...goodHabits.map(h => getPeriodStreak(h, today, 'week')))
+  const monthlyStreak = goodHabits.length === 0 ? 0 : Math.min(...goodHabits.map(h => getPeriodStreak(h, today, 'month')))
+  const atRiskCount = goodHabits.filter(h => getTwoDayRuleStatus(h, today).atRisk).length
+  const timerMinutesToday = goodHabits.reduce((sum, habit) => sum + getDurationForDate(habit, today), 0)
   const totalSaved = badHabits.reduce((sum, h) => sum + h.cleanDays.length * (h.costPerDay || 0), 0)
   const currency = badHabits[0]?.currency || '€'
+
   const currentTimeBlock = useMemo(() => {
     const h = new Date().getHours()
     if (h >= 6 && h < 12) return 'morning'
@@ -121,51 +134,33 @@ export default function DashboardPage() {
     evening: [],
     anytime: [],
   }
+
   goodHabits.forEach(h => {
     const block = h.timeOfDay || 'anytime'
-    if (block in blockMap) {
-      blockMap[block as keyof typeof blockMap].push(h)
-    } else {
-      console.warn('Unknown habit timeOfDay. Falling back to anytime.', { habitId: h._id, block })
-      blockMap.anytime.push(h)
-    }
+    if (block in blockMap) blockMap[block].push(h)
+    else blockMap.anytime.push(h)
   })
 
   return (
     <div className="max-w-lg mx-auto px-4 space-y-5 pb-4">
-
-      {/* ── Hero progress card ── */}
       <div className="pt-1">
-        <StatsRing
-          completed={completedCount}
-          total={totalGood}
-          loading={loading}
-          streak={streak}
-        />
+        <StatsRing completed={completedCount} total={totalGood} loading={loading} streak={streak} />
       </div>
 
-      {/* ── Quick summary chips ── */}
       {!loading && (badHabits.length > 0 || streak > 0) && (
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-          {streak > 1 && (
-            <Chip icon="🔥" label={`${streak}-day streak`} color="#FF6B35" />
-          )}
-          {personalBestStreak > streak && (
-            <Chip icon="🏅" label={`Best ${personalBestStreak} days`} color="#FFD60A" />
-          )}
-          {badHabits.length > 0 && totalSaved > 0 && (
-            <Chip icon="💰" label={`${currency}${totalSaved.toFixed(0)} saved`} color="#00FF88" />
-          )}
-          {completedCount === totalGood && totalGood > 0 && (
-            <Chip icon="🏆" label="All habits done!" color="#FFD60A" />
-          )}
-          {badHabits.filter(h => h.cleanDays.includes(today)).length > 0 && (
-            <Chip icon="✨" label="Clean day!" color="#8B5CF6" />
-          )}
+          {streak > 1 && <Chip icon="🔥" label={`${streak}-day streak`} color="#FF6B35" />}
+          {personalBestStreak > streak && <Chip icon="🏅" label={`Best ${personalBestStreak} days`} color="#FFD60A" />}
+          {weeklyStreak > 0 && <Chip icon="📆" label={`${weeklyStreak} weekly wins`} color="#8B5CF6" />}
+          {monthlyStreak > 0 && <Chip icon="🗓️" label={`${monthlyStreak} monthly wins`} color="#00D4FF" />}
+          {timerMinutesToday > 0 && <Chip icon="⏱️" label={`${timerMinutesToday} min focused`} color="#00D4FF" />}
+          {badHabits.length > 0 && totalSaved > 0 && <Chip icon="💰" label={`${currency}${totalSaved.toFixed(0)} saved`} color="#00FF88" />}
+          {completedCount === totalGood && totalGood > 0 && <Chip icon="🏆" label="All habits done!" color="#FFD60A" />}
+          {badHabits.filter(h => h.cleanDays.includes(today)).length > 0 && <Chip icon="✨" label="Clean day!" color="#8B5CF6" />}
+          {atRiskCount > 0 && <Chip icon="⚠️" label={`${atRiskCount} habit at risk`} color="#FFD60A" />}
         </div>
       )}
 
-      {/* ── Good habits section ── */}
       <section>
         <SectionHeader
           title="Good Habits"
@@ -176,17 +171,10 @@ export default function DashboardPage() {
 
         {loading ? (
           <div className="space-y-3">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="skeleton h-[72px] rounded-2xl" style={{ animationDelay: `${i * 0.1}s` }} />
-            ))}
+            {[1, 2, 3].map(i => <div key={i} className="skeleton h-[72px] rounded-2xl" style={{ animationDelay: `${i * 0.1}s` }} />)}
           </div>
         ) : goodHabits.length === 0 ? (
-          <EmptyState
-            icon="✨"
-            text="No good habits yet"
-            action="Add your first habit"
-            href="/dashboard/habits"
-          />
+          <EmptyState icon="✨" text="No good habits yet" action="Add your first habit" href="/dashboard/habits" />
         ) : (
           <div className="space-y-2.5">
             <TimeBlockSection
@@ -234,86 +222,52 @@ export default function DashboardPage() {
         )}
       </section>
 
-      {/* ── Breaking bad section ── */}
       {!loading && badHabits.length > 0 && (
         <section>
-          <SectionHeader
-            title="Breaking Bad"
-            badge="Track free days"
-            badgeColor="#FF6B35"
-          />
+          <SectionHeader title="Breaking Bad" badge="Track free days" badgeColor="#FF6B35" />
           <div className="space-y-2.5">
             {badHabits.map((habit, idx) => (
-              <div
-                key={habit._id}
-                style={{
-                  animation: 'slide_up 0.4s ease-out both',
-                  animationDelay: `${idx * 0.08}s`,
-                }}
-              >
-                <BadHabitCard
-                  habit={habit}
-                  today={today}
-                  onToggle={() => toggleHabit(habit._id, 'toggle_clean')}
-                />
+              <div key={habit._id} style={{ animation: 'slide_up 0.4s ease-out both', animationDelay: `${idx * 0.08}s` }}>
+                <BadHabitCard habit={habit} today={today} onToggle={() => toggleHabit(habit._id, 'toggle_clean')} />
               </div>
             ))}
           </div>
         </section>
       )}
 
-      {/* ── Today's tasks ── */}
       <section>
-        <SectionHeader
-          title="Today's Tasks"
-          href="/dashboard/todos"
-        />
+        <SectionHeader title="Today's Tasks" href="/dashboard/todos" />
         <QuickTodo />
       </section>
 
-      <MissedHabitSheet
-        open={missedSheetOpen}
-        habits={missedHabits}
-        onClose={() => setMissedSheetOpen(false)}
-        onSubmit={logMissedHabit}
-      />
+      <section>
+        <SectionHeader title="Schedule View" badge="Reminders + cadence" badgeColor="#00D4FF" href="/dashboard/schedule" />
+        <Link href="/dashboard/schedule">
+          <div className="rounded-3xl p-5 transition-all hover:bg-white/[0.06]" style={{ background: 'rgba(26,26,36,0.8)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <p className="text-sm text-white font-medium">Open weekly schedule and upcoming reminders</p>
+            <p className="text-xs text-white/35 mt-1">Use this for weekly/monthly habits, time-based sessions and location prompts.</p>
+          </div>
+        </Link>
+      </section>
 
+      <MissedHabitSheet open={missedSheetOpen} habits={missedHabits} onClose={() => setMissedSheetOpen(false)} onSubmit={logMissedHabit} />
     </div>
   )
 }
 
-/* ─── Sub-components ─── */
-
-function SectionHeader({
-  title, badge, badgeColor, href
-}: {
-  title: string
-  badge?: string
-  badgeColor?: string
-  href?: string
-}) {
+function SectionHeader({ title, badge, badgeColor, href }: { title: string; badge?: string; badgeColor?: string; href?: string }) {
   return (
     <div className="flex items-center justify-between mb-3">
       <h2 className="font-display font-bold text-white" style={{ fontSize: 18 }}>{title}</h2>
       <div className="flex items-center gap-2">
         {badge && (
-          <span
-            className="text-xs font-semibold px-2.5 py-1 rounded-full font-mono"
-            style={{
-              background: badgeColor ? badgeColor + '18' : 'rgba(255,255,255,0.07)',
-              color: badgeColor || 'rgba(255,255,255,0.45)',
-              border: `1px solid ${badgeColor ? badgeColor + '35' : 'rgba(255,255,255,0.1)'}`,
-            }}
-          >
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full font-mono" style={{ background: badgeColor ? badgeColor + '18' : 'rgba(255,255,255,0.07)', color: badgeColor || 'rgba(255,255,255,0.45)', border: `1px solid ${badgeColor ? badgeColor + '35' : 'rgba(255,255,255,0.1)'}` }}>
             {badge}
           </span>
         )}
         {href && (
           <Link href={href}>
-            <div
-              className="w-7 h-7 rounded-full flex items-center justify-center transition-all hover:bg-white/10"
-              style={{ background: 'rgba(255,255,255,0.05)' }}
-            >
+            <div className="w-7 h-7 rounded-full flex items-center justify-center transition-all hover:bg-white/10" style={{ background: 'rgba(255,255,255,0.05)' }}>
               <ArrowRight size={13} style={{ color: 'rgba(255,255,255,0.4)' }} />
             </div>
           </Link>
@@ -325,14 +279,7 @@ function SectionHeader({
 
 function Chip({ icon, label, color }: { icon: string; label: string; color: string }) {
   return (
-    <div
-      className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap"
-      style={{
-        background: color + '15',
-        border: `1px solid ${color}30`,
-        color,
-      }}
-    >
+    <div className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap" style={{ background: color + '15', border: `1px solid ${color}30`, color }}>
       <span>{icon}</span>
       <span>{label}</span>
     </div>
@@ -342,10 +289,7 @@ function Chip({ icon, label, color }: { icon: string; label: string; color: stri
 function EmptyState({ icon, text, action, href }: { icon: string; text: string; action: string; href: string }) {
   return (
     <Link href={href}>
-      <div
-        className="flex flex-col items-center justify-center py-8 rounded-2xl transition-all hover:bg-white/5 cursor-pointer"
-        style={{ border: '1px dashed rgba(255,255,255,0.1)' }}
-      >
+      <div className="flex flex-col items-center justify-center py-8 rounded-2xl transition-all hover:bg-white/5 cursor-pointer" style={{ border: '1px dashed rgba(255,255,255,0.1)' }}>
         <span style={{ fontSize: 28, marginBottom: 8 }}>{icon}</span>
         <p className="text-sm font-body" style={{ color: 'rgba(255,255,255,0.3)' }}>{text}</p>
         <p className="text-xs mt-1 font-semibold" style={{ color: '#00FF88' }}>{action} →</p>
@@ -354,7 +298,6 @@ function EmptyState({ icon, text, action, href }: { icon: string; text: string; 
   )
 }
 
-/* ─── Helper ─── */
 function calcStreak(goodHabits: Habit[], today: string): number {
   if (goodHabits.length === 0) return 0
   let streak = 0
