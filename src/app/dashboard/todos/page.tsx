@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Plus, Trash2, CheckCircle2, Circle } from 'lucide-react'
+import NotificationTester from '@/components/notifications/NotificationTester'
 import { getLocalDefaultReminderTime, getResolvedTimeZone, requestNotificationPermission, sendBrowserNotification, supportsNotifications } from '@/lib/notifications'
 
 interface Todo {
@@ -104,6 +105,8 @@ export default function TodosPage() {
         <h1 className="font-display text-2xl font-black text-white">Tasks</h1>
         <p className="text-sm text-white/40">{pending} pending · {done} completed</p>
       </div>
+
+      <NotificationTester />
 
       {/* Add form */}
       <form onSubmit={add}
