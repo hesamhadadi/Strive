@@ -25,3 +25,4 @@ A stunning PWA habit tracker built with Next.js 14, MongoDB, TypeScript & Tailwi
 - **next-pwa**
 - **Playfair Display** + **DM Sans** fonts
 - **Lucide React** icons
+
